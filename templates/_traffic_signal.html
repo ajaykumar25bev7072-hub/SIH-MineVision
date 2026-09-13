@@ -1,0 +1,20 @@
+{# ========================================================
+   REUSABLE TRAFFIC SIGNAL CHIP (3-DOT: RED / AMBER / GREEN)
+   Active dot: Full opacity + glow
+   Inactive dots: ~15% opacity
+   ======================================================== #}
+{% macro traffic_signal(risk_state) %}
+<span class="traffic-signal-chip" title="CAS Risk State: {{ risk_state }}">
+  <span class="traffic-dot red {% if risk_state == 'DANGER' %}active{% else %}dimmed{% endif %}"></span>
+  <span class="traffic-dot amber {% if risk_state == 'CAUTION' %}active{% else %}dimmed{% endif %}"></span>
+  <span class="traffic-dot green {% if risk_state == 'NOMINAL' %}active{% else %}dimmed{% endif %}"></span>
+</span>
+{% endmacro %}
+
+{% if risk is defined %}
+<span class="traffic-signal-chip" title="CAS Risk State: {{ risk }}">
+  <span class="traffic-dot red {% if risk == 'DANGER' %}active{% else %}dimmed{% endif %}"></span>
+  <span class="traffic-dot amber {% if risk == 'CAUTION' %}active{% else %}dimmed{% endif %}"></span>
+  <span class="traffic-dot green {% if risk == 'NOMINAL' %}active{% else %}dimmed{% endif %}"></span>
+</span>
+{% endif %}

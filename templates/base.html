@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}MineBoard | Collision Avoidance System{% endblock %}</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bg: '#090d16',
+              surface: '#0f172a',
+              card: '#131d31',
+              border: '#1e293b',
+              accent: '#38bdf8'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'IBM Plex Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Custom Styles (21st.dev Theme Tokens & Micro-Interactions) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-[#090d16] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500/20 selection:text-sky-300">
+
+  <!-- TOP APP NAVBAR -->
+  <header class="sticky top-0 z-50 bg-[#0c1220]/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-2.5 transition-all">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Product Title -->
+      <div class="flex items-center gap-6">
+        <a href="/" class="flex items-center gap-2.5 group">
+          <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 group-hover:bg-sky-500/20 transition-all shadow-[0_0_12px_rgba(56,189,248,0.2)]">
+            <i data-lucide="shield-alert" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="font-mono text-sm font-bold tracking-wider uppercase text-white flex items-center gap-1.5">
+              <span>MINE<span class="text-sky-400">BOARD</span></span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-normal">CAS v2.4</span>
+            </div>
+            <div class="text-[11px] text-slate-400 font-sans tracking-wide">Autonomous Fleet Collision Avoidance</div>
+          </div>
+        </a>
+
+        <!-- Main Navigation Links -->
+        <nav class="hidden md:flex items-center gap-1 font-mono text-xs">
+          <a href="/" class="px-3 py-1.5 rounded-md transition-all {% if active_page == 'fleet' %}bg-sky-500/15 text-sky-400 font-semibold border border-sky-500/30 shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+              Fleet Controller
+            </span>
+          </a>
+          
+          <div class="h-4 w-px bg-slate-800 mx-1"></div>
+
+          {% for tid in ['Truck A', 'Truck B', 'Truck C', 'Truck D'] %}
+          <a href="/truck/{{ tid }}" class="px-2.5 py-1.5 rounded-md transition-all {% if active_page == tid %}bg-sky-500/15 text-sky-400 font-semibold border border-sky-500/30 shadow-sm{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="truck" class="w-3.5 h-3.5"></i>
+              {{ tid }}
+            </span>
+          </a>
+          {% endfor %}
+        </nav>
+      </div>
+
+      <!-- Simulation Playback & Replay Controls -->
+      <div class="flex items-center gap-3 ml-auto">
+        <!-- Step Progress Pill -->
+        <div class="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg font-mono text-xs shadow-inner">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.6)]"></span>
+          <span class="text-slate-400">Step:</span>
+          <span id="nav-step-counter" class="text-white font-bold text-sm">{{ current_step + 1 }}</span>
+          <span class="text-slate-600">/ 50</span>
+          <span id="nav-timestamp" class="text-[11px] text-sky-400 ml-1 font-semibold">{{ current_telemetry.timestamp }}</span>
+        </div>
+
+        <!-- Step Forward Button -->
+        <button id="btn-step-forward" type="button" class="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-mono text-xs font-bold rounded-lg transition-all shadow-[0_0_14px_rgba(56,189,248,0.25)] active:scale-95 focus:outline-none">
+          <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+          <span>Step Telemetry</span>
+          <kbd class="hidden sm:inline-block ml-1 px-1 py-0.5 text-[9px] bg-sky-600/30 text-slate-900 rounded font-sans uppercase">Space</kbd>
+        </button>
+
+        <!-- Reset Button -->
+        <button id="btn-reset-demo" type="button" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white font-mono text-xs rounded-lg border border-slate-700/60 transition-all active:scale-95 focus:outline-none" title="Reset Demo (Key: R)">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Reset</span>
+          <kbd class="hidden md:inline-block text-[9px] text-slate-500">R</kbd>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- BOTTOM STATUS FOOTER -->
+  <footer class="border-t border-slate-900/80 bg-[#060a12] px-4 py-3 text-slate-500 font-mono text-xs">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        <span>SECTOR 4 HAUL ROAD &bull; V2V ESP-NOW MESH (4/4 NODES CONNECTED)</span>
+      </div>
+      <div class="text-slate-400">
+        Smart India Hackathon &bull; Collision Avoidance System
+      </div>
+    </div>
+  </footer>
+
+  <!-- Core Scripts -->
+  <script src="{{ url_for('static', filename='js/radar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script>
+    // Initialize Lucide Icons on initial page render
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>

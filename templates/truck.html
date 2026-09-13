@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% from "_traffic_signal.html" import traffic_signal %}
+
+{% block title %}{{ truck_id }} In-Cab | MineBoard CAS{% endblock %}
+
+{% block content %}
+{% set t = truck %}
+{% set is_danger = t.risk == 'DANGER' %}
+{% set is_caution = t.risk == 'CAUTION' %}
+{% set risk_color = '#ef4444' if is_danger else ('#f59e0b' if is_caution else '#10b981') %}
+{% set risk_glow = 'var(--danger-glow)' if is_danger else ('var(--caution-glow)' if is_caution else 'var(--safe-glow)') %}
+
+<div class="space-y-6">
+
+  <!-- ========================================================
+       IN-CAB HEADER & VEHICLE STATUS STRIP
+       ======================================================== -->
+  <!-- 21ST.DEV STYLE SLOT: In-Cab Header Bar -->
+  <div class="bg-slate-900/80 border border-slate-800/80 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center">
+        <i data-lucide="truck" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-mono text-base font-bold text-white tracking-wide uppercase">{{ t.truck_name }}</h1>
+          {{ traffic_signal(t.risk) }}
+        </div>
+        <div class="text-xs text-slate-400 font-sans">
+          CAT 797F Heavy Hauler &bull; ESP32-S3 Dual-Core Terminal &bull; Driver Cockpit HUD
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Vehicle Fleet Switcher Buttons -->
+    <div class="flex items-center gap-1.5 font-mono text-xs">
+      <span class="text-slate-500 text-[11px] mr-1 hidden sm:inline">SWITCH:</span>
+      {% for other_id in ['Truck A', 'Truck B', 'Truck C', 'Truck D'] %}
+      <a href="/truck/{{ other_id }}" 
+         class="px-2.5 py-1 rounded-md border transition-all {% if other_id == truck_id %}bg-sky-500/20 text-sky-300 border-sky-500/40 font-bold{% else %}bg-slate-800/50 text-slate-400 border-slate-700/60 hover:text-white hover:bg-slate-700/50{% endif %}">
+        {{ other_id }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MAIN COCKPIT GRID (AI VISION + HAZARD & TTC + SENSORS)
+       ======================================================== -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- ========================================================
+         LEFT: SIMULATED AI OPTICAL VISION VIEWPORT (5 COLS)
+         ======================================================== -->
+    <!-- 21ST.DEV STYLE SLOT: In-Cab AI Camera Viewport HUD -->
+    <div class="lg:col-span-5 flex flex-col space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="camera" class="w-4 h-4 text-sky-400"></i>
+          <span class="text-xs font-mono font-bold tracking-wider uppercase text-slate-200">AI Vision &bull; Forward Hazard Cone</span>
+        </div>
+        <!-- Minimal Icon-Only HUD Overlays -->
+        <div class="flex items-center gap-2 text-slate-400 font-mono text-[11px]">
+          <span class="flex items-center gap-1 text-rose-500 animate-pulse font-bold">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span> REC
+          </span>
+          <span class="text-slate-600">&bull;</span>
+          <i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400" title="V2V Mesh 5.8 GHz Active"></i>
+          <span class="text-slate-600">&bull;</span>
+          <i data-lucide="crosshair" class="w-3.5 h-3.5 text-sky-400" title="Object Auto-Lock Engaged"></i>
+        </div>
+      </div>
+
+      <!-- Camera Viewport Canvas Container -->
+      <div class="cam-viewport h-[350px] relative flex items-center justify-center border border-slate-800 rounded-xl overflow-hidden shadow-inner">
+        <div class="scanlines"></div>
+        <div class="cam-corner tl"></div>
+        <div class="cam-corner tr"></div>
+        <div class="cam-corner bl"></div>
+        <div class="cam-corner br"></div>
+
+        <!-- Center Crosshair Reticle -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+          <div class="w-24 h-24 border border-sky-400 rounded-full flex items-center justify-center">
+            <div class="w-1 h-1 bg-sky-400 rounded-full"></div>
+          </div>
+          <div class="absolute w-36 h-px bg-sky-400/40"></div>
+          <div class="absolute h-36 w-px bg-sky-400/40"></div>
+        </div>
+
+        <!-- Dynamic Simulated Bounding Box for Detected Obstacle -->
+        {% set dist = t.distance_m %}
+        {% set box_w = (230 / ((dist ** 0.5) if dist > 1 else 1)) | int %}
+        {% set box_w = [box_w, 200] | min %}
+        {% set box_w = [box_w, 65] | max %}
+        {% set box_h = (box_w * 0.7) | int %}
+        {% set bbox_cls = 'danger' if is_danger else ('caution' if is_caution else 'safe') %}
+
+        <div id="ai-bounding-box" 
+             class="cam-target-bbox {{ bbox_cls }}"
+             style="width: {{ box_w }}px; height: {{ box_h }}px;">
+          <!-- Floating Tag Above Box -->
+          <div class="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase text-slate-950 whitespace-nowrap"
+               style="background-color: {{ risk_color }};">
+            <span id="ai-target-label">{{ t.obstacle_target[:18] }}</span> &bull; <span id="ai-target-dist">{{ t.distance_m }}m</span>
+          </div>
+        </div>
+
+        <!-- Bottom Icon-Only HUD Strip -->
+        <div class="absolute bottom-3 left-4 right-4 flex items-center justify-between text-slate-400 font-mono text-[11px] z-10">
+          <div class="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1 rounded border border-slate-800">
+            <i data-lucide="radio" class="w-3.5 h-3.5 text-sky-400"></i>
+            <span id="ai-detection-source" class="text-slate-300 font-semibold text-[10px]">{{ t.detection_source }}</span>
+          </div>
+          <div class="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1 rounded border border-slate-800">
+            <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span class="text-slate-300 font-semibold text-[10px]">60&deg; FOV</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-[11px] font-mono text-slate-500 flex items-center justify-between">
+        <span>YOLO-v8 Edge Inference &bull; 30 FPS</span>
+        <span>Detection Range: 1.0m &ndash; 50.0m</span>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         RIGHT: HAZARD BANNER, TTC RADIAL GAUGE & SENSOR ICON GRID (7 COLS)
+         ======================================================== -->
+    <div class="lg:col-span-7 flex flex-col space-y-4">
+      
+      <!-- 21ST.DEV STYLE SLOT: Hazard State Banner & Radial TTC Countdown -->
+      <div id="cockpit-hazard-banner" 
+           class="p-5 rounded-xl border flex flex-col sm:flex-row items-center justify-between gap-6 transition-all {% if is_danger %}bg-rose-950/25 border-rose-500/50 shadow-[0_0_20px_rgba(239,68,68,0.15)] alert-pulse-danger{% elif is_caution %}bg-amber-950/20 border-amber-500/40 shadow-[0_0_16px_rgba(245,158,11,0.12)]{% else %}bg-emerald-950/20 border-emerald-500/40{% endif %}">
+        
+        <!-- Left: Risk State & Headline -->
+        <div class="space-y-1.5 text-center sm:text-left flex-1">
+          <div class="flex items-center justify-center sm:justify-start gap-2">
+            <span class="text-xs font-mono uppercase tracking-widest text-slate-400">Collision Avoidance Advisory</span>
+            {{ traffic_signal(t.risk) }}
+          </div>
+          
+          <div id="hazard-state-title" class="text-2xl sm:text-3xl font-bold font-mono tracking-wide" style="color: {{ risk_color }};">
+            {% if is_danger %}
+            <span class="flex items-center justify-center sm:justify-start gap-2">
+              <i data-lucide="shield-alert" class="w-7 h-7 animate-bounce"></i>
+              DANGER
+            </span>
+            {% elif is_caution %}
+            <span class="flex items-center justify-center sm:justify-start gap-2">
+              <i data-lucide="alert-triangle" class="w-7 h-7"></i>
+              CAUTION
+            </span>
+            {% else %}
+            <span class="flex items-center justify-center sm:justify-start gap-2">
+              <i data-lucide="shield-check" class="w-7 h-7"></i>
+              NOMINAL
+            </span>
+            {% endif %}
+          </div>
+          
+          <div id="hazard-headline" class="text-xs font-semibold text-slate-200">
+            {{ t.risk_headline }}
+          </div>
+          <div id="hazard-action" class="text-[11px] text-slate-400 font-mono">
+            {{ t.risk_action }}
+          </div>
+        </div>
+
+        <!-- Right: Radial SVG Circular TTC Gauge -->
+        <div class="flex flex-col items-center justify-center">
+          <div class="relative w-28 h-28 flex items-center justify-center">
+            <!-- Radial SVG Ring -->
+            <svg class="w-full h-full radial-progress-svg" viewBox="0 0 100 100">
+              <circle class="radial-progress-bg" cx="50" cy="50" r="40" />
+              {% set raw_ttc = t.ttc_s if t.ttc_s < 900 else 10.0 %}
+              {% set pct = [1.0, raw_ttc / 8.0] | min %}
+              {% set stroke_dash = (2 * 3.14159 * 40) | round(1) %}
+              {% set offset = (stroke_dash * (1 - pct)) | round(1) %}
+              <circle id="radial-progress-bar"
+                      class="radial-progress-fill"
+                      cx="50" cy="50" r="40"
+                      stroke="{{ risk_color }}"
+                      stroke-dasharray="{{ stroke_dash }}"
+                      stroke-dashoffset="{{ offset }}" />
+            </svg>
+            
+            <!-- Value in Center of Ring -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center font-mono">
+              <span class="text-[10px] uppercase text-slate-400 tracking-wider">TTC</span>
+              <span id="radial-ttc-value" class="text-xl font-bold" style="color: {{ risk_color }};">
+                {% if t.ttc_s < 900 %}{{ t.ttc_s }}<span class="text-xs font-normal">s</span>{% else %}&infin;{% endif %}
+              </span>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono text-slate-400 mt-1">Impact Horizon</span>
+        </div>
+
+      </div>
+
+      <!-- 21ST.DEV STYLE SLOT: Sensor Icon Tiles Grid with Hover Tooltip -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="cpu" class="w-3.5 h-3.5 text-sky-400"></i>
+            Instrument Cluster &bull; Micro-Sensors (Hover for Telemetry)
+          </span>
+          <span class="text-[10px] font-mono text-slate-500">6 Telemetry Channels</span>
+        </div>
+
+        <!-- 6 Micro Sensor Icon Tiles Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          
+          <!-- Tile 1: HC-SR04 Ultrasonic Distance -->
+          <div class="sensor-tile" tabindex="0">
+            <div class="sensor-tooltip" id="tooltip-dist">
+              FORWARD: {{ t.distance_m }} m
+            </div>
+            <div class="w-9 h-9 rounded-lg {% if t.distance_m < 15 %}bg-rose-500/15 text-rose-400 border border-rose-500/30{% else %}bg-slate-800 text-sky-400 border border-slate-700{% endif %} flex items-center justify-center mb-1.5 transition-all">
+              <i data-lucide="radar" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-mono font-semibold text-slate-300">Proximity</span>
+            <div class="flex items-center gap-1 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full {% if t.distance_m < 15 %}bg-rose-500 animate-ping{% else %}bg-emerald-400{% endif %}"></span>
+              <span class="text-[9px] font-mono text-slate-400">HC-SR04</span>
+            </div>
+          </div>
+
+          <!-- Tile 2: MQ-2 Exhaust Gas Sensor -->
+          <div class="sensor-tile" tabindex="0">
+            <div class="sensor-tooltip" id="tooltip-gas">
+              GAS: {{ t.gas_ppm }} PPM
+            </div>
+            <div class="w-9 h-9 rounded-lg {% if t.gas_ppm >= 500 %}bg-rose-500/15 text-rose-400 border border-rose-500/30{% elif t.gas_ppm >= 300 %}bg-amber-500/15 text-amber-400 border border-amber-500/30{% else %}bg-slate-800 text-sky-400 border border-slate-700{% endif %} flex items-center justify-center mb-1.5 transition-all">
+              <i data-lucide="flame" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-mono font-semibold text-slate-300">Exhaust Gas</span>
+            <div class="flex items-center gap-1 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full {% if t.gas_ppm >= 500 %}bg-rose-500 animate-ping{% elif t.gas_ppm >= 300 %}bg-amber-400{% else %}bg-emerald-400{% endif %}"></span>
+              <span class="text-[9px] font-mono text-slate-400">MQ-2</span>
+            </div>
+          </div>
+
+          <!-- Tile 3: DHT22 Temp & Humidity -->
+          <div class="sensor-tile" tabindex="0">
+            <div class="sensor-tooltip" id="tooltip-climate">
+              {{ t.temp_c }}&deg;C &bull; {{ t.humidity }}% RH
+            </div>
+            <div class="w-9 h-9 rounded-lg {% if t.humidity >= 80 %}bg-amber-500/15 text-amber-400 border border-amber-500/30{% else %}bg-slate-800 text-sky-400 border border-slate-700{% endif %} flex items-center justify-center mb-1.5 transition-all">
+              <i data-lucide="thermometer" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-mono font-semibold text-slate-300">Temp / RH</span>
+            <div class="flex items-center gap-1 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full {% if t.humidity >= 80 %}bg-amber-400{% else %}bg-emerald-400{% endif %}"></span>
+              <span class="text-[9px] font-mono text-slate-400">DHT22</span>
+            </div>
+          </div>
+
+          <!-- Tile 4: YL-83 Rain / Surface Slickness -->
+          <div class="sensor-tile" tabindex="0">
+            <div class="sensor-tooltip" id="tooltip-rain">
+              SURFACE: {% if t.rain %}SLICK / RAIN{% else %}DRY ROAD{% endif %}
+            </div>
+            <div class="w-9 h-9 rounded-lg {% if t.rain %}bg-amber-500/15 text-amber-400 border border-amber-500/30{% else %}bg-slate-800 text-sky-400 border border-slate-700{% endif %} flex items-center justify-center mb-1.5 transition-all">
+              <i data-lucide="cloud-rain" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-mono font-semibold text-slate-300">Surface Rain</span>
+            <div class="flex items-center gap-1 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full {% if t.rain %}bg-amber-400{% else %}bg-emerald-400{% endif %}"></span>
+              <span class="text-[9px] font-mono text-slate-400">YL-83</span>
+            </div>
+          </div>
+
+          <!-- Tile 5: PIR Lateral Blind-Spot Motion -->
+          <div class="sensor-tile" tabindex="0">
+            <div class="sensor-tooltip" id="tooltip-pir">
+              PIR: {% if t.motion %}PERSONNEL DETECTED (3.2m){% else %}BLIND SPOT CLEAR{% endif %}
+            </div>
+            <div class="w-9 h-9 rounded-lg {% if t.motion %}bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse{% else %}bg-slate-800 text-sky-400 border border-slate-700{% endif %} flex items-center justify-center mb-1.5 transition-all">
+              <i data-lucide="user-check" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-mono font-semibold text-slate-300">Blind Spot</span>
+            <div class="flex items-center gap-1 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full {% if t.motion %}bg-rose-500 animate-ping{% else %}bg-emerald-400{% endif %}"></span>
+              <span class="text-[9px] font-mono text-slate-400">PIR Motion</span>
+            </div>
+          </div>
+
+          <!-- Tile 6: Neo-6M GPS & Heading -->
+          <div class="sensor-tile" tabindex="0">
+            <div class="sensor-tooltip" id="tooltip-gps">
+              GPS: ({{ t.x }}, {{ t.y }}) &bull; {{ t.speed_kmh }} km/h
+            </div>
+            <div class="w-9 h-9 rounded-lg bg-slate-800 text-sky-400 border border-slate-700 flex items-center justify-center mb-1.5 transition-all">
+              <i data-lucide="navigation" class="w-5 h-5"></i>
+            </div>
+            <span class="text-[11px] font-mono font-semibold text-slate-300">Kinematics</span>
+            <div class="flex items-center gap-1 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span class="text-[9px] font-mono text-slate-400">Neo-6M</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Quick Metrics Strip -->
+      <div class="grid grid-cols-3 gap-3 bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 text-center font-mono">
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">Vehicle Velocity</span>
+          <span id="strip-speed" class="text-lg font-bold text-white">{{ t.speed_kmh }}</span>
+          <span class="text-xs text-slate-400">km/h</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">Obstacle Distance</span>
+          <span id="strip-distance" class="text-lg font-bold text-white">{{ t.distance_m }}</span>
+          <span class="text-xs text-slate-400">m</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-500 uppercase block">Closing Rate</span>
+          <span id="strip-closing" class="text-lg font-bold text-sky-400">{{ t.speed_ms }}</span>
+          <span class="text-xs text-slate-400">m/s</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

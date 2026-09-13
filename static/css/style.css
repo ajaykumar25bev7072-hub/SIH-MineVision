@@ -1,0 +1,353 @@
+/* ============ THEME VARIABLES — swap values here after copying from 21st.dev ============ */
+:root {
+  --bg: #090d16;
+  --surface: #0f172a;
+  --surface-card: #131d31;
+  --surface-border: #1e293b;
+  --surface-hover: #1e293b;
+  --accent: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.25);
+  --danger: #ef4444;
+  --danger-glow: rgba(239, 68, 68, 0.35);
+  --caution: #f59e0b;
+  --caution-glow: rgba(245, 158, 11, 0.35);
+  --safe: #10b981;
+  --safe-glow: rgba(16, 185, 129, 0.35);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ========================================================
+   REUSABLE TRAFFIC SIGNAL CHIP (3-DOT)
+   ======================================================== */
+.traffic-signal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid var(--surface-border);
+  padding: 3px 6px;
+  border-radius: 9999px;
+}
+
+.traffic-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.traffic-dot.red {
+  background-color: var(--danger);
+}
+.traffic-dot.amber {
+  background-color: var(--caution);
+}
+.traffic-dot.green {
+  background-color: var(--safe);
+}
+
+.traffic-dot.active {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.traffic-dot.active.red {
+  box-shadow: 0 0 8px var(--danger);
+}
+.traffic-dot.active.amber {
+  box-shadow: 0 0 8px var(--caution);
+}
+.traffic-dot.active.green {
+  box-shadow: 0 0 8px var(--safe);
+}
+
+.traffic-dot.dimmed {
+  opacity: 0.15;
+}
+
+/* ========================================================
+   2D LIVE POSITION MAP STYLING
+   ======================================================== */
+.map-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  background: radial-gradient(circle at center, #0e1726 0%, #080d1a 100%);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.map-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, rgba(30, 41, 59, 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30, 41, 59, 0.4) 1px, transparent 1px);
+  background-size: 38px 38px;
+  pointer-events: none;
+}
+
+.map-crosshair-h {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(56, 189, 248, 0.12);
+  pointer-events: none;
+}
+
+.map-crosshair-v {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(56, 189, 248, 0.12);
+  pointer-events: none;
+}
+
+.truck-blip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 10;
+  transition: left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.truck-blip-inner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.truck-blip:hover .truck-blip-inner {
+  transform: scale(1.4);
+}
+
+.truck-blip-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  animation: pulse-blip 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes pulse-blip {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.truck-blip.danger .truck-blip-inner {
+  background-color: var(--danger);
+  box-shadow: 0 0 10px var(--danger);
+}
+.truck-blip.danger .truck-blip-ring {
+  border: 2px solid var(--danger);
+}
+
+.truck-blip.caution .truck-blip-inner {
+  background-color: var(--caution);
+  box-shadow: 0 0 10px var(--caution);
+}
+.truck-blip.caution .truck-blip-ring {
+  border: 2px solid var(--caution);
+}
+
+.truck-blip.safe .truck-blip-inner {
+  background-color: var(--safe);
+  box-shadow: 0 0 10px var(--safe);
+}
+.truck-blip.safe .truck-blip-ring {
+  border: 2px solid var(--safe);
+}
+
+/* Map hover tooltip */
+.truck-tooltip {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--surface-border);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.truck-blip:hover .truck-tooltip {
+  opacity: 1;
+}
+
+/* ========================================================
+   SIMULATED AI CAMERA HUD
+   ======================================================== */
+.cam-viewport {
+  position: relative;
+  background: radial-gradient(circle at center, #0f172a 0%, #030712 100%);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0.18) 6px
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+.cam-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(56, 189, 248, 0.75);
+  border-style: solid;
+  border-width: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.cam-corner.tl { top: 12px; left: 12px; border-top-width: 2px; border-left-width: 2px; }
+.cam-corner.tr { top: 12px; right: 12px; border-top-width: 2px; border-right-width: 2px; }
+.cam-corner.bl { bottom: 12px; left: 12px; border-bottom-width: 2px; border-left-width: 2px; }
+.cam-corner.br { bottom: 12px; right: 12px; border-bottom-width: 2px; border-right-width: 2px; }
+
+.cam-target-bbox {
+  position: absolute;
+  border: 2px solid;
+  transition: all 0.35s ease;
+  z-index: 4;
+}
+
+.cam-target-bbox.danger {
+  border-color: var(--danger);
+  box-shadow: 0 0 14px var(--danger-glow);
+}
+.cam-target-bbox.caution {
+  border-color: var(--caution);
+  box-shadow: 0 0 14px var(--caution-glow);
+}
+.cam-target-bbox.safe {
+  border-color: var(--safe);
+  box-shadow: 0 0 14px var(--safe-glow);
+}
+
+/* ========================================================
+   CIRCULAR TTC RADIAL GAUGE
+   ======================================================== */
+.radial-progress-svg {
+  transform: rotate(-90deg);
+}
+
+.radial-progress-bg {
+  fill: none;
+  stroke: rgba(30, 41, 59, 0.6);
+  stroke-width: 7;
+}
+
+.radial-progress-fill {
+  fill: none;
+  stroke-width: 7;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease, stroke 0.4s ease;
+}
+
+/* ========================================================
+   SENSOR ICON TILES (HOVER REVEAL)
+   ======================================================== */
+.sensor-tile {
+  position: relative;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.sensor-tile:hover {
+  background: var(--surface-hover);
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.sensor-tile .sensor-tooltip {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #020617;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  z-index: 30;
+}
+
+.sensor-tile:hover .sensor-tooltip,
+.sensor-tile:focus .sensor-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+/* Micro pulse for danger cards */
+@keyframes alert-pulse {
+  0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+  70% { border-color: rgba(239, 68, 68, 0.8); box-shadow: 0 0 16px 2px rgba(239, 68, 68, 0.25); }
+  100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.alert-pulse-danger {
+  animation: alert-pulse 2.2s infinite ease-in-out;
+}
