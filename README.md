@@ -29,4 +29,4 @@ A Flask-based dashboard for monitoring and preventing collisions in autonomous m
 - `static/`: CSS and JavaScript files
 - `data/`: Precomputed `sample_data.json` telemetry file
 
-- Made by https://github.com/ajaykumar25bev7072-hub [AJAY] and https://github.com/_______________________[HARINI].
+- Made by https://github.com/ajaykumar25bev7072-hub [AJAY] and https://github.com/deshpandeharini0316-dotcom [HARINI].
